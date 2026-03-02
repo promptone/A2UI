@@ -29,6 +29,7 @@ import {
   type ChartConfiguration,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import type {Context as DatalabelsContext} from 'chartjs-plugin-datalabels';
 
 // Register the Chart.js components we need (controllers + elements + plugins)
 ChartJS.register(
@@ -45,8 +46,9 @@ ChartJS.register(
   ChartDataLabels
 );
 
-// Palette for chart segments
-const PALETTE = [
+// Palette CSS custom property names and their default values.
+// Override via --chart-color-0 … --chart-color-9 on a parent element.
+const PALETTE_DEFAULTS = [
   '#4285F4', // blue
   '#EA4335', // red
   '#FBBC04', // yellow
@@ -188,10 +190,8 @@ export class ChartComponent extends Root {
     return '';
   }
 
-  private resolveChartData(): ChartDataItem[] {
-    let raw: unknown = this.chartData;
-
-    // Resolve path reference (same pattern as OrgChart)
+  /** Resolves a path reference via the data model processor. */
+  private resolveDataFromPath(raw: unknown): unknown {
     if (
       raw &&
       typeof raw === 'object' &&
@@ -199,62 +199,76 @@ export class ChartComponent extends Root {
     ) {
       const pathObj = raw as {path: string};
       if (this.processor) {
-        raw = this.processor.getData(
+        return this.processor.getData(
           this.component,
           pathObj.path,
           this.surfaceId ?? 'default'
         );
       }
     }
+    return raw;
+  }
 
-    // Model processor may return Map — normalize to Array
+  /** Converts a Map (from the model processor) to a sorted Array. */
+  private normalizeMapToArray(raw: unknown): unknown {
     if (raw instanceof Map) {
       const entries = Array.from(
         raw.entries() as IterableIterator<[string, unknown]>
       );
-      entries.sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10));
-      raw = entries.map((e) => e[1]);
+      entries.sort(
+        (a, b) => parseInt(a[0], 10) - parseInt(b[0], 10)
+      );
+      return entries.map((e) => e[1]);
     }
+    return raw;
+  }
 
-    if (!Array.isArray(raw)) return [];
+  /** Reads a named field from an item (Map or plain object). */
+  private static fieldFrom(
+    item: unknown,
+    key: string
+  ): unknown {
+    if (item instanceof Map) return item.get(key);
+    return (item as Record<string, unknown>)?.[key];
+  }
 
-    return (raw as unknown[]).map((item) => {
-      const getVal = (k: string): unknown => {
-        if (item instanceof Map) return item.get(k);
-        return (item as Record<string, unknown>)?.[k];
-      };
+  /** Transforms a raw array into typed ChartDataItems. */
+  private transformDataItems(
+    items: unknown[]
+  ): ChartDataItem[] {
+    return items.map((item) => {
+      let rawDrill = ChartComponent.fieldFrom(item, 'drillDown');
+      rawDrill = this.normalizeMapToArray(rawDrill);
 
-      // Resolve drillDown sub-array (may also be a Map from the processor)
       let drillDown: ChartDataItem[] | undefined;
-      let rawDrill = getVal('drillDown');
-      if (rawDrill instanceof Map) {
-        const entries = Array.from(
-          rawDrill.entries() as IterableIterator<[string, unknown]>
-        );
-        entries.sort(
-          (a, b) => parseInt(a[0], 10) - parseInt(b[0], 10)
-        );
-        rawDrill = entries.map((e) => e[1]);
-      }
       if (Array.isArray(rawDrill) && rawDrill.length > 0) {
-        drillDown = (rawDrill as unknown[]).map((sub) => {
-          const subVal = (k: string): unknown => {
-            if (sub instanceof Map) return sub.get(k);
-            return (sub as Record<string, unknown>)?.[k];
-          };
-          return {
-            label: String(subVal('label') ?? ''),
-            value: Number(subVal('value') ?? 0),
-          };
-        });
+        drillDown = (rawDrill as unknown[]).map((sub) => ({
+          label: String(
+            ChartComponent.fieldFrom(sub, 'label') ?? ''
+          ),
+          value: Number(
+            ChartComponent.fieldFrom(sub, 'value') ?? 0
+          ),
+        }));
       }
 
       return {
-        label: String(getVal('label') ?? ''),
-        value: Number(getVal('value') ?? 0),
+        label: String(
+          ChartComponent.fieldFrom(item, 'label') ?? ''
+        ),
+        value: Number(
+          ChartComponent.fieldFrom(item, 'value') ?? 0
+        ),
         ...(drillDown ? {drillDown} : {}),
       };
     });
+  }
+
+  private resolveChartData(): ChartDataItem[] {
+    let raw: unknown = this.resolveDataFromPath(this.chartData);
+    raw = this.normalizeMapToArray(raw);
+    if (!Array.isArray(raw)) return [];
+    return this.transformDataItems(raw as unknown[]);
   }
 
   // ---------------------------------------------------------------------------
@@ -291,6 +305,15 @@ export class ChartComponent extends Root {
   // Chart lifecycle
   // ---------------------------------------------------------------------------
 
+  /** Resolves palette colors from CSS custom properties with fallbacks. */
+  private resolvePalette(): string[] {
+    const styles = getComputedStyle(this);
+    return PALETTE_DEFAULTS.map((fallback, i) => {
+      const v = styles.getPropertyValue(`--chart-color-${i}`);
+      return v.trim() || fallback;
+    });
+  }
+
   private destroyChart() {
     if (this.chartInstance) {
       this.chartInstance.destroy();
@@ -317,8 +340,9 @@ export class ChartComponent extends Root {
     if (!view) return;
 
     const {labels, values} = view;
+    const palette = this.resolvePalette();
     const colors = labels.map(
-      (_, i) => PALETTE[i % PALETTE.length]
+      (_, i) => palette[i % palette.length]
     );
 
     this.destroyChart();
@@ -378,8 +402,10 @@ export class ChartComponent extends Root {
                 const num =
                   typeof val === 'number'
                     ? val
-                    : ((val as unknown as Record<string, number>)
-                        .y ?? val);
+                    : (typeof val === 'object' && val !== null &&
+                          'y' in val
+                        ? (val as Record<string, number>).y
+                        : (val as number));
                 if (isPieType) {
                   const total = (
                     ctx.dataset.data as number[]
@@ -397,9 +423,7 @@ export class ChartComponent extends Root {
           // On-wedge percentage labels (pie/doughnut only)
           datalabels: isPieType
             ? {
-                // tslint:disable-next-line:no-any
-                // Chart.js datalabels plugin context type
-                formatter: (value: number, ctx: any) => {
+                formatter: (value: number, ctx: DatalabelsContext) => {
                   const total = (
                     ctx.chart.data.datasets[0].data as number[]
                   ).reduce((a, b) => a + b, 0);

@@ -3,6 +3,31 @@
 import json
 
 
+def _to_value_map(items: list[dict]) -> list[dict]:
+  """Converts a list of plain dicts into indexed A2UI valueMap entries.
+
+  Each dict's values are mapped to the appropriate A2UI type
+  (valueString, valueNumber, valueBoolean). Lists of dicts are
+  recursively converted to nested valueMaps.
+  """
+  result = []
+  for i, item in enumerate(items):
+    entries = []
+    for k, v in item.items():
+      if isinstance(v, str):
+        entries.append({"key": k, "valueString": v})
+      elif isinstance(v, bool):
+        entries.append({"key": k, "valueBoolean": v})
+      elif isinstance(v, (int, float)):
+        entries.append({"key": k, "valueNumber": v})
+      elif isinstance(v, list):
+        entries.append({"key": k, "valueMap": _to_value_map(v)})
+      else:
+        entries.append({"key": k, "valueString": str(v)})
+    result.append({"key": str(i), "valueMap": entries})
+  return result
+
+
 def get_gallery_json() -> str:
   """Returns the JSON structure for the Component Gallery surfaces."""
 
@@ -26,294 +51,84 @@ def get_gallery_json() -> str:
           # Chart demo data
           {
               "key": "pieChartData",
-              "valueMap": [
+              "valueMap": _to_value_map([
                   {
-                      "key": "0",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Apparel"},
-                          {"key": "value", "valueNumber": 41},
-                          {
-                              "key": "drillDown",
-                              "valueMap": [
-                                  {
-                                      "key": "0",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Tops"},
-                                          {"key": "value", "valueNumber": 31},
-                                      ],
-                                  },
-                                  {
-                                      "key": "1",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Bottoms"},
-                                          {"key": "value", "valueNumber": 38},
-                                      ],
-                                  },
-                                  {
-                                      "key": "2",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Outerwear"},
-                                          {"key": "value", "valueNumber": 20},
-                                      ],
-                                  },
-                                  {
-                                      "key": "3",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Footwear"},
-                                          {"key": "value", "valueNumber": 11},
-                                      ],
-                                  },
-                              ],
-                          },
+                      "label": "Apparel",
+                      "value": 41,
+                      "drillDown": [
+                          {"label": "Tops", "value": 31},
+                          {"label": "Bottoms", "value": 38},
+                          {"label": "Outerwear", "value": 20},
+                          {"label": "Footwear", "value": 11},
                       ],
                   },
                   {
-                      "key": "1",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Electronics"},
-                          {"key": "value", "valueNumber": 28},
-                          {
-                              "key": "drillDown",
-                              "valueMap": [
-                                  {
-                                      "key": "0",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Phones"},
-                                          {"key": "value", "valueNumber": 25},
-                                      ],
-                                  },
-                                  {
-                                      "key": "1",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Laptops"},
-                                          {"key": "value", "valueNumber": 27},
-                                      ],
-                                  },
-                                  {
-                                      "key": "2",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "TVs"},
-                                          {"key": "value", "valueNumber": 21},
-                                      ],
-                                  },
-                              ],
-                          },
+                      "label": "Electronics",
+                      "value": 28,
+                      "drillDown": [
+                          {"label": "Phones", "value": 25},
+                          {"label": "Laptops", "value": 27},
+                          {"label": "TVs", "value": 21},
                       ],
                   },
                   {
-                      "key": "2",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Home Goods"},
-                          {"key": "value", "valueNumber": 15},
-                          {
-                              "key": "drillDown",
-                              "valueMap": [
-                                  {
-                                      "key": "0",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Furniture"},
-                                          {"key": "value", "valueNumber": 8},
-                                      ],
-                                  },
-                                  {
-                                      "key": "1",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Kitchen"},
-                                          {"key": "value", "valueNumber": 16},
-                                      ],
-                                  },
-                                  {
-                                      "key": "2",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Decor"},
-                                          {"key": "value", "valueNumber": 3},
-                                      ],
-                                  },
-                              ],
-                          },
+                      "label": "Home Goods",
+                      "value": 15,
+                      "drillDown": [
+                          {"label": "Furniture", "value": 8},
+                          {"label": "Kitchen", "value": 16},
+                          {"label": "Decor", "value": 3},
                       ],
                   },
-                  {
-                      "key": "3",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Health"},
-                          {"key": "value", "valueNumber": 10},
-                      ],
-                  },
-                  {
-                      "key": "4",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Other"},
-                          {"key": "value", "valueNumber": 6},
-                      ],
-                  },
-              ],
+                  {"label": "Health", "value": 10},
+                  {"label": "Other", "value": 6},
+              ]),
           },
           {
               "key": "barChartData",
-              "valueMap": [
-                  {
-                      "key": "0",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Jan"},
-                          {"key": "value", "valueNumber": 12},
-                      ],
-                  },
-                  {
-                      "key": "1",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Feb"},
-                          {"key": "value", "valueNumber": 19},
-                      ],
-                  },
-                  {
-                      "key": "2",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Mar"},
-                          {"key": "value", "valueNumber": 15},
-                      ],
-                  },
-                  {
-                      "key": "3",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Apr"},
-                          {"key": "value", "valueNumber": 22},
-                      ],
-                  },
-                  {
-                      "key": "4",
-                      "valueMap": [
-                          {"key": "label", "valueString": "May"},
-                          {"key": "value", "valueNumber": 30},
-                      ],
-                  },
-                  {
-                      "key": "5",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Jun"},
-                          {"key": "value", "valueNumber": 28},
-                      ],
-                  },
-              ],
+              "valueMap": _to_value_map([
+                  {"label": "Jan", "value": 12},
+                  {"label": "Feb", "value": 19},
+                  {"label": "Mar", "value": 15},
+                  {"label": "Apr", "value": 22},
+                  {"label": "May", "value": 30},
+                  {"label": "Jun", "value": 28},
+              ]),
           },
           # OrgChart demo data
           {
               "key": "orgChartChain",
-              "valueMap": [
-                  {
-                      "key": "0",
-                      "valueMap": [
-                          {"key": "title", "valueString": "CEO"},
-                          {"key": "name", "valueString": "Alice Johnson"},
-                      ],
-                  },
-                  {
-                      "key": "1",
-                      "valueMap": [
-                          {"key": "title", "valueString": "SVP Engineering"},
-                          {"key": "name", "valueString": "Bob Smith"},
-                      ],
-                  },
-                  {
-                      "key": "2",
-                      "valueMap": [
-                          {"key": "title", "valueString": "VP Product"},
-                          {"key": "name", "valueString": "Charlie Brown"},
-                      ],
-                  },
-                  {
-                      "key": "3",
-                      "valueMap": [
-                          {"key": "title", "valueString": "Director"},
-                          {"key": "name", "valueString": "Diana Prince"},
-                      ],
-                  },
-                  {
-                      "key": "4",
-                      "valueMap": [
-                          {"key": "title", "valueString": "Software Engineer"},
-                          {"key": "name", "valueString": "Evan Wright"},
-                      ],
-                  },
-              ],
+              "valueMap": _to_value_map([
+                  {"title": "CEO", "name": "Alice Johnson"},
+                  {"title": "SVP Engineering", "name": "Bob Smith"},
+                  {"title": "VP Product", "name": "Charlie Brown"},
+                  {"title": "Director", "name": "Diana Prince"},
+                  {"title": "Software Engineer", "name": "Evan Wright"},
+              ]),
           },
           {
               "key": "doughnutChartData",
-              "valueMap": [
+              "valueMap": _to_value_map([
                   {
-                      "key": "0",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Engineering"},
-                          {"key": "value", "valueNumber": 45},
-                          {
-                              "key": "drillDown",
-                              "valueMap": [
-                                  {
-                                      "key": "0",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Frontend"},
-                                          {"key": "value", "valueNumber": 18},
-                                      ],
-                                  },
-                                  {
-                                      "key": "1",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Backend"},
-                                          {"key": "value", "valueNumber": 15},
-                                      ],
-                                  },
-                                  {
-                                      "key": "2",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Infra"},
-                                          {"key": "value", "valueNumber": 12},
-                                      ],
-                                  },
-                              ],
-                          },
+                      "label": "Engineering",
+                      "value": 45,
+                      "drillDown": [
+                          {"label": "Frontend", "value": 18},
+                          {"label": "Backend", "value": 15},
+                          {"label": "Infra", "value": 12},
                       ],
                   },
                   {
-                      "key": "1",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Marketing"},
-                          {"key": "value", "valueNumber": 20},
-                          {
-                              "key": "drillDown",
-                              "valueMap": [
-                                  {
-                                      "key": "0",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Digital"},
-                                          {"key": "value", "valueNumber": 12},
-                                      ],
-                                  },
-                                  {
-                                      "key": "1",
-                                      "valueMap": [
-                                          {"key": "label", "valueString": "Brand"},
-                                          {"key": "value", "valueNumber": 8},
-                                      ],
-                                  },
-                              ],
-                          },
+                      "label": "Marketing",
+                      "value": 20,
+                      "drillDown": [
+                          {"label": "Digital", "value": 12},
+                          {"label": "Brand", "value": 8},
                       ],
                   },
-                  {
-                      "key": "2",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Operations"},
-                          {"key": "value", "valueNumber": 20},
-                      ],
-                  },
-                  {
-                      "key": "3",
-                      "valueMap": [
-                          {"key": "label", "valueString": "Sales"},
-                          {"key": "value", "valueNumber": 15},
-                      ],
-                  },
-              ],
+                  {"label": "Operations", "value": 20},
+                  {"label": "Sales", "value": 15},
+              ]),
           },
       ],
   }
